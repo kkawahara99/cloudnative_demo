@@ -1,0 +1,12 @@
+{
+    "name": "Cloud Native Demo",
+    "dockerComposeFile": "compose.yml",
+    "service": "cloudnative_demo",
+    "workspaceFolder":  "/tmp/work",
+    "extensions": [
+        "ms-python.python"
+    ],
+    "settings": {
+        "editor.tabSize": 2,
+    },
+}

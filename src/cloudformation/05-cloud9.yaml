@@ -1,0 +1,80 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Create Cloud9
+
+Parameters:
+  SystemName:
+    Description: System name.
+    Type: String
+  EnvName:
+    Description: Environmental name.
+    Type: String
+    AllowedValues: [dev, stg, prod]
+  InstanceType:
+    Type: String
+    Default: t2.micro
+    AllowedValues: [t2.micro, t2.small, t2.medium]
+
+Resources:
+# ------------------------------------------------------- #
+# Cloud9
+# ------------------------------------------------------- #
+  Env:
+    Type: AWS::Cloud9::EnvironmentEC2
+    Properties:
+      Name: !Sub ${SystemName}-${EnvName}-management-env
+      InstanceType: !Ref InstanceType
+      AutomaticStopTimeMinutes: 30
+      SubnetId: { "Fn::ImportValue": !Sub "${SystemName}-${EnvName}-subnet-public-ingress-a-id" }
+# ------------------------------------------------------- #
+# IAM Policy
+# ------------------------------------------------------- #
+  IamPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${SystemName}-${EnvName}-accessing-ecr-repository-policy
+      Roles:
+        - !Ref IamRole
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+        - Sid: "ListImageInRepository"
+          Effect: Allow
+          Action: 
+          - "ecr:ListImages"
+          Resource: { "Fn::ImportValue": !Sub "${SystemName}${EnvName}demo" }
+        - Sid: "GetAutorizationToken"
+          Effect: Allow
+          Action: 
+          - "ecr:GetAuthorizationToken"
+          Resource: "*"
+        - Sid: "ManageRepositoryContents"
+          Effect: Allow
+          Action: 
+          - "ecr:GetAuthorizationToken"
+          - "ecr:BatchCheckLayerAvailability"
+          - "ecr:GetDownloadUrlForLayer"
+          - "ecr:GetRepositoryPolicy"
+          - "ecr:DescribeRepositories"
+          - "ecr:ListImages"
+          - "ecr:DescribeImages"
+          - "ecr:BatchGetImage"
+          - "ecr:InitiateLayerUpload"
+          - "ecr:UploadLayerPart"
+          - "ecr:CompleteLayerUpload"
+          - "ecr:PutImage"
+          Resource: { "Fn::ImportValue": !Sub "${SystemName}${EnvName}demo" }
+# ------------------------------------------------------- #
+# IAM Role
+# ------------------------------------------------------- #
+  IamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${SystemName}-${EnvName}-cloud9-role
+      Path: /
+      AssumeRolePolicyDocument: 
+        Version: "2012-10-17"
+        Statement: 
+        - Effect: Allow
+          Principal: 
+            Service: "ec2.amazonaws.com"
+          Action: "sts:AssumeRole"

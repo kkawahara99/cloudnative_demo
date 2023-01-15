@@ -1,0 +1,89 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Create ECS
+
+Parameters:
+  SystemName:
+    Description: System name.
+    Type: String
+  EnvName:
+    Description: Environmental name.
+    Type: String
+    AllowedValues: [dev, stg, prod]
+  ContainerName:
+    Type: String
+  ECSTaskDesiredCount:
+    Type: Number
+
+Resources:
+# ------------------------------------------------------- #
+# ECS Cluster
+# ------------------------------------------------------- #
+  ECSCluster:
+    Type: 'AWS::ECS::Cluster'
+    Properties:
+      ClusterName: !Sub '${SystemName}-${EnvName}-ecs-cluster'
+      ClusterSettings:
+        - Name: containerInsights
+          Value: enabled
+# ------------------------------------------------------- #
+# ECS TaskDefinition
+# ------------------------------------------------------- #
+  ECSTaskDefinition:
+    Type: 'AWS::ECS::TaskDefinition'
+    Properties:
+      Family: !Sub '${SystemName}-${EnvName}-ecs-task'
+      RequiresCompatibilities:
+        - FARGATE
+      ExecutionRoleArn: !Sub 'arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole'
+      NetworkMode: awsvpc
+      Memory: 1024
+      Cpu: 512
+
+      #ContainerDefinitions
+      ContainerDefinitions:
+        - Name: !Sub '${SystemName}${EnvName}demo'
+          Image: !Sub '${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${ContainerName}:v1'
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Sub '/ecs/${SystemName}-${EnvName}-task'
+              awslogs-region: !Sub '${AWS::Region}'
+              awslogs-stream-prefix: ecs
+          MemoryReservation: 512
+          PortMappings:
+            - HostPort: 80
+              Protocol: tcp
+              ContainerPort: 80
+          Cpu: 256
+# ------------------------------------------------------- #
+# ECS Service
+# ------------------------------------------------------- #
+  ECSService:
+    Type: AWS::ECS::Service
+    Properties:
+      LaunchType: FARGATE
+      TaskDefinition: !Ref ECSTaskDefinition
+      Cluster: !Ref ECSCluster
+      ServiceName: !Sub '${SystemName}-${EnvName}-ecs-service'
+      DesiredCount: !Ref ECSTaskDesiredCount
+      DeploymentConfiguration:
+        MaximumPercent: 200
+        MinimumHealthyPercent: 100
+      DeploymentController:
+        Type: CODE_DEPLOY
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          Subnets:
+            - { "Fn::ImportValue": !Sub "${SystemName}-${EnvName}-subnet-private-container-1a-id" }
+            - { "Fn::ImportValue": !Sub "${SystemName}-${EnvName}-subnet-private-container-1c-id" }
+          SecurityGroups:
+            - { "Fn::ImportValue": !Sub "${SystemName}-${EnvName}-sg-container-id" }
+          AssignPublicIp: DISABLED
+      HealthCheckGracePeriodSeconds: 120
+      LoadBalancers:
+        - TargetGroupArn: { "Fn::ImportValue": !Sub "${SystemName}-${EnvName}-tg-demo-blue-arn" }
+          ContainerPort: 80
+          ContainerName: !Sub '${SystemName}${EnvName}demo'
+        - TargetGroupArn: { "Fn::ImportValue": !Sub "${SystemName}-${EnvName}-tg-demo-green-arn" }
+          ContainerPort: 10080
+          ContainerName: !Sub '${SystemName}${EnvName}demo'

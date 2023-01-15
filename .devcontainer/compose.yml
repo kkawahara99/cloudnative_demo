@@ -1,0 +1,23 @@
+services:
+  cloudnative_demo:
+    image: cloudnative_demo:1.0
+    build: ./src
+    container_name: 'cloudnative_demo'
+    stdin_open: true
+    tty: true
+    working_dir: '/tmp/work'
+    volumes:
+      - ../src:/tmp/work
+    env_file:
+      - .env
+    environment:
+      AWS_DEFAULT_REGION: ap-northeast-1
+      AWS_DEFAULT_OUTPUT: json
+      TZ: Asia/Tokyo
+  simple_webserver:
+    build: ./web
+    container_name: 'simple_webserver'
+    volumes:
+      - ../web:/usr/local/apache2/htdocs
+    ports:
+      - "8080:80"

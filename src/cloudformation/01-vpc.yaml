@@ -1,0 +1,314 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Create VPC Network
+
+Parameters:
+  SystemName:
+    Description: System name.
+    Type: String
+  EnvName:
+    Description: Environmental name.
+    Type: String
+    AllowedValues: [dev, stg, prod]
+
+Mappings: 
+  AzMap: 
+    ap-northeast-1:
+      1st: ap-northeast-1a
+      2nd: ap-northeast-1c
+      3rd: ap-northeast-1d
+
+Resources:
+# ------------------------------------------------------- #
+# VPC
+# ------------------------------------------------------- #
+  MainVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsSupport: 'true'
+      EnableDnsHostnames: 'true'
+      Tags:
+      - Key: Name
+        Value: !Sub ${SystemName}-${EnvName}-vpc
+# ------------------------------------------------------- #
+# InternetGateway
+# ------------------------------------------------------- #
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+      - Key: Name
+        Value: !Sub ${SystemName}-${EnvName}-igw
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref MainVPC
+      InternetGatewayId: !Ref InternetGateway
+# ------------------------------------------------------- #
+# Security Group
+# ------------------------------------------------------- #
+  AlbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: SG
+      VpcId:
+        !Ref MainVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+      Tags:
+      - Key: Name
+        Value: !Sub ${SystemName}-${EnvName}-sg-ingress
+# ------------------------------------------------------- #
+# Subnet
+# ------------------------------------------------------- #
+  SubnetPublicIngressA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        !Ref MainVPC
+      CidrBlock: 10.0.0.0/24
+      AvailabilityZone: !FindInMap [AzMap, !Ref AWS::Region, 1st]
+      Tags:
+      - Key: Name
+        Value: !Sub ${SystemName}-${EnvName}-subnet-public-ingress-1a
+  SubnetPublicIngressC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        !Ref MainVPC
+      CidrBlock: 10.0.1.0/24
+      AvailabilityZone: !FindInMap [AzMap, !Ref AWS::Region, 2nd]
+      Tags:
+      - Key: Name
+        Value: !Sub ${SystemName}-${EnvName}-subnet-public-ingress-1c
+  SubnetPrivateContainerA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        !Ref MainVPC
+      CidrBlock: 10.0.8.0/24
+      AvailabilityZone: !FindInMap [AzMap, !Ref AWS::Region, 1st]
+      Tags:
+      - Key: Name
+        Value: !Sub ${SystemName}-${EnvName}-subnet-private-container-1a
+  SubnetPrivateContainerC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        !Ref MainVPC
+      CidrBlock: 10.0.9.0/24
+      AvailabilityZone: !FindInMap [AzMap, !Ref AWS::Region, 2nd]
+      Tags:
+      - Key: Name
+        Value: !Sub ${SystemName}-${EnvName}-subnet-private-container-1c
+  SubnetPrivateDbA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        !Ref MainVPC
+      CidrBlock: 10.0.16.0/24
+      AvailabilityZone: !FindInMap [AzMap, !Ref AWS::Region, 1st]
+      Tags:
+      - Key: Name
+        Value: !Sub ${SystemName}-${EnvName}-subnet-private-db-1a
+  SubnetPrivateDbC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        !Ref MainVPC
+      CidrBlock: 10.0.17.0/24
+      AvailabilityZone: !FindInMap [AzMap, !Ref AWS::Region, 2nd]
+      Tags:
+      - Key: Name
+        Value: !Sub ${SystemName}-${EnvName}-subnet-private-db-1c
+  SubnetPublicManagementA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        !Ref MainVPC
+      CidrBlock: 10.0.240.0/24
+      AvailabilityZone: !FindInMap [AzMap, !Ref AWS::Region, 1st]
+      Tags:
+      - Key: Name
+        Value: !Sub ${SystemName}-${EnvName}-subnet-public-management-1a
+  SubnetPublicManagementC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        !Ref MainVPC
+      CidrBlock: 10.0.241.0/24
+      AvailabilityZone: !FindInMap [AzMap, !Ref AWS::Region, 2nd]
+      Tags:
+      - Key: Name
+        Value: !Sub ${SystemName}-${EnvName}-subnet-public-management-1c
+  SubnetPrivateEgressA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        !Ref MainVPC
+      CidrBlock: 10.0.248.0/24
+      AvailabilityZone: !FindInMap [AzMap, !Ref AWS::Region, 1st]
+      Tags:
+      - Key: Name
+        Value: !Sub ${SystemName}-${EnvName}-subnet-private-egress-1a
+  SubnetPrivateEgressC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        !Ref MainVPC
+      CidrBlock: 10.0.249.0/24
+      AvailabilityZone: !FindInMap [AzMap, !Ref AWS::Region, 2nd]
+      Tags:
+      - Key: Name
+        Value: !Sub ${SystemName}-${EnvName}-subnet-private-egress-1c
+# ------------------------------------------------------- #
+# RouteTable
+# ------------------------------------------------------- #
+  # RouteTableInternet
+  RouteTableInternet:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:  
+        !Ref MainVPC
+      Tags:
+      - Key: Name
+        Value: !Sub ${SystemName}-${EnvName}-route-internet
+  RouteInternet:
+    Type: AWS::EC2::Route
+    Properties:
+       RouteTableId:
+         !Ref RouteTableInternet
+       DestinationCidrBlock: 0.0.0.0/0
+       GatewayId:
+         !Ref InternetGateway
+  SubnetRouteTableAssociationPublicIngressA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId:
+        !Ref SubnetPublicIngressA
+      RouteTableId:
+        !Ref RouteTableInternet
+  SubnetRouteTableAssociationPublicIngressC:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId:
+        !Ref SubnetPublicIngressC
+      RouteTableId:
+        !Ref RouteTableInternet
+  SubnetRouteTableAssociationPublicManagementA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId:
+        !Ref SubnetPublicManagementA
+      RouteTableId:
+        !Ref RouteTableInternet
+  SubnetRouteTableAssociationPublicManagementC:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId:
+        !Ref SubnetPublicManagementC
+      RouteTableId:
+        !Ref RouteTableInternet
+  # RouteTableApp
+  RouteTableApp:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        !Ref MainVPC
+      Tags:
+      - Key: Name
+        Value: !Sub ${SystemName}-${EnvName}-route-app
+  SubnetRouteTableAssociationPrivateContainerA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId:
+        !Ref SubnetPrivateContainerA
+      RouteTableId:
+        !Ref RouteTableApp
+  SubnetRouteTableAssociationPrivateContainerC:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId:
+        !Ref SubnetPrivateContainerC
+      RouteTableId:
+        !Ref RouteTableApp
+  # RouteTableManagement
+  RouteTableManagement:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        !Ref MainVPC
+      Tags:
+      - Key: Name
+        Value: !Sub ${SystemName}-${EnvName}-route-management
+  RouteManagement:
+    Type: AWS::EC2::Route
+    Properties:
+       RouteTableId:
+         !Ref RouteTableManagement
+       DestinationCidrBlock: 0.0.0.0/0
+       GatewayId:
+         !Ref InternetGateway
+  # SubnetRouteTableAssociationPrivateManagementA:
+  #   Type: AWS::EC2::SubnetRouteTableAssociation
+  #   Properties:
+  #     SubnetId:
+  #       !Ref SubnetPublicManagementA
+  #     RouteTableId:
+  #       !Ref RouteTableManagement
+  # SubnetRouteTableAssociationPrivateManagementC:
+  #   Type: AWS::EC2::SubnetRouteTableAssociation
+  #   Properties:
+  #     SubnetId:
+  #       !Ref SubnetPublicManagementC
+  #     RouteTableId:
+  #       !Ref RouteTableManagement
+
+Outputs:
+# VPC
+  MainVPC:
+    Value: !Ref MainVPC
+    Export:
+      Name: !Sub ${SystemName}-${EnvName}-vpc-id
+# InternetGateway
+  AlbSecurityGroup:
+    Value: !Ref AlbSecurityGroup
+    Export:
+      Name: !Sub ${SystemName}-${EnvName}-sg-ingress-id
+# Subnet
+  SubnetPublicIngressA:
+    Value: !Ref SubnetPublicIngressA
+    Export:
+      Name: !Sub ${SystemName}-${EnvName}-subnet-public-ingress-a-id
+  SubnetPublicIngressC:
+    Value: !Ref SubnetPublicIngressC
+    Export:
+      Name: !Sub ${SystemName}-${EnvName}-subnet-public-ingress-c-id
+  SubnetPrivateEgressA:
+    Value: !Ref SubnetPrivateEgressA
+    Export:
+      Name: !Sub ${SystemName}-${EnvName}-subnet-private-egress-a-id
+  SubnetPrivateEgressC:
+    Value: !Ref SubnetPrivateEgressC
+    Export:
+      Name: !Sub ${SystemName}-${EnvName}-subnet-private-egress-c-id
+  SubnetPrivateContainerA:
+    Value: !Ref SubnetPrivateContainerA
+    Export:
+      Name: !Sub ${SystemName}-${EnvName}-subnet-private-container-1a-id
+  SubnetPrivateContainerC:
+    Value: !Ref SubnetPrivateContainerC
+    Export:
+      Name: !Sub ${SystemName}-${EnvName}-subnet-private-container-1c-id
+# RouteTable
+  RouteTableApp:
+    Value: !Ref RouteTableApp
+    Export:
+      Name: !Sub ${SystemName}-${EnvName}-route-app-id
+  RouteTableManagement:
+    Value: !Ref RouteTableManagement
+    Export:
+      Name: !Sub ${SystemName}-${EnvName}-route-management-id
