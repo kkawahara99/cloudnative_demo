@@ -7,7 +7,9 @@ https://www.impressrd.jp/news/detail/86
 
 # 近況
 2023/1/15
+
 構築済み・・・VPC、ELB、WAF、ECR、Cloud9(使えない)、VPCエンドポイント
+
 未構築・・・ECS、Fargate、CICD周り
 
 # 使い方
