@@ -6,9 +6,9 @@ CloudFormationテンプレートベースで構築してみました。
 https://www.impressrd.jp/news/detail/86
 
 # 近況
-2023/1/15
+2023/1/16
 
-構築済み・・・VPC、ELB、WAF、ECR、Cloud9(使えない)、VPCエンドポイント
+構築済み・・・VPC、ELB、WAF、ECR、Cloud9（使えるけど別途細工が必要）、VPCエンドポイント
 
 未構築・・・ECS、Fargate、CICD周り
 
