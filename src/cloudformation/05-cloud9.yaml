@@ -78,3 +78,13 @@ Resources:
           Principal: 
             Service: "ec2.amazonaws.com"
           Action: "sts:AssumeRole"
+# ------------------------------------------------------- #
+# IAM Instance Profile
+# ------------------------------------------------------- #
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: !Sub ${SystemName}-${EnvName}-cloud9-role
+      Path: /
+      Roles:
+        - !Ref IamRole

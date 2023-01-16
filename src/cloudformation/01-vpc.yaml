@@ -198,20 +198,6 @@ Resources:
         !Ref SubnetPublicIngressC
       RouteTableId:
         !Ref RouteTableInternet
-  SubnetRouteTableAssociationPublicManagementA:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      SubnetId:
-        !Ref SubnetPublicManagementA
-      RouteTableId:
-        !Ref RouteTableInternet
-  SubnetRouteTableAssociationPublicManagementC:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      SubnetId:
-        !Ref SubnetPublicManagementC
-      RouteTableId:
-        !Ref RouteTableInternet
   # RouteTableApp
   RouteTableApp:
     Type: AWS::EC2::RouteTable
@@ -252,20 +238,20 @@ Resources:
        DestinationCidrBlock: 0.0.0.0/0
        GatewayId:
          !Ref InternetGateway
-  # SubnetRouteTableAssociationPrivateManagementA:
-  #   Type: AWS::EC2::SubnetRouteTableAssociation
-  #   Properties:
-  #     SubnetId:
-  #       !Ref SubnetPublicManagementA
-  #     RouteTableId:
-  #       !Ref RouteTableManagement
-  # SubnetRouteTableAssociationPrivateManagementC:
-  #   Type: AWS::EC2::SubnetRouteTableAssociation
-  #   Properties:
-  #     SubnetId:
-  #       !Ref SubnetPublicManagementC
-  #     RouteTableId:
-  #       !Ref RouteTableManagement
+  SubnetRouteTableAssociationPrivateManagementA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId:
+        !Ref SubnetPublicManagementA
+      RouteTableId:
+        !Ref RouteTableManagement
+  SubnetRouteTableAssociationPrivateManagementC:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId:
+        !Ref SubnetPublicManagementC
+      RouteTableId:
+        !Ref RouteTableManagement
 
 Outputs:
 # VPC

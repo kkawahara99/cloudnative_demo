@@ -49,7 +49,7 @@ function delete_stack() {
 # 説明：
 # stack-listの下から順にスタックを削除する
 # ------------------------------------------------------- #
-for line in `echo "$(cat stack-list)" | tac`
+for line in `echo "$(cat ${STACK_LIST})" | tac`
 do
   delete_stack $line
 done

@@ -1,7 +1,7 @@
 FROM python:3.9
 
 # 各種ツールインストール
-RUN apt-get update && apt-get install -y curl unzip sudo
+RUN apt-get update && apt-get install -y curl unzip sudo less
 
 # aws cli v2 のインストール
 # https://docs.aws.amazon.com/ja_jp/cli/latest/userguide/install-cliv2-linux.html
