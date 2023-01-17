@@ -20,10 +20,12 @@ docker-compose run --rm cloudnative_demo /bin/bash
 docker-compose down --rmi all
 ```
 
+構築シェル
 ```bash
-./bash/dev_deploy.sh
+./bash/driver.sh
 ```
 
+Cloud9でのECRへのPush
 ```bash
 git clone https://github.com/kkawahara99/cloudnative_demo.git
 cd cloudnative_demo
