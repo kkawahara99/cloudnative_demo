@@ -3,13 +3,7 @@
 # ------------------------------------------------------- #
 # ログ管理
 # ------------------------------------------------------- #
-LOG_OUT=./stdout.log
-LOG_ERR=./stderr.log
-exec 1> >(
-  while read -r l; do echo "[$(date +"%Y-%m-%d %H:%M:%S")] $l"; done \
-    | tee -a $LOG_OUT
-)
-exec 2>>$LOG_ERR
+source ./util/log_manager.sh
 
 # ------------------------------------------------------- #
 # 引数チェック
@@ -27,21 +21,9 @@ export ENV_NAME=$2
 export STACK_LIST=./stack-list
 
 # ------------------------------------------------------- #
-# スタック削除関数
+# 関数インポート
 # ------------------------------------------------------- #
-function delete_stack() {
-  # スタックID（stack-listから取得）
-  stackId=$1
-  # スタック名
-  stackName=${SYSTEM_NAME}-${ENV_NAME}-stack-${stackId}
-
-  echo "### deleting ${stackName} ... ###"
-  aws cloudformation delete-stack \
-    --stack-name ${stackName}
-  aws cloudformation wait stack-delete-complete \
-    --stack-name ${stackName}
-  echo "### ${stackName} deleted! ###"
-}
+source ./util/delete_stack.sh
 
 # ------------------------------------------------------- #
 # Main
