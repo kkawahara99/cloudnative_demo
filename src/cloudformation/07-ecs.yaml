@@ -87,3 +87,60 @@ Resources:
         - TargetGroupArn: { "Fn::ImportValue": !Sub "${SystemName}-${EnvName}-tg-demo-green-arn" }
           ContainerPort: 10080
           ContainerName: !Sub '${SystemName}${EnvName}demo'
+# ------------------------------------------------------- #
+# IAM Policy
+# ------------------------------------------------------- #
+  IamPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${SystemName}-${EnvName}-accessing-ecr-repository-policy
+      Roles:
+        - !Ref IamRole
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+        - Sid: "ListImageInRepository"
+          Effect: Allow
+          Action: 
+          - "ecr:ListImages"
+          Resource: { "Fn::ImportValue": !Sub "${SystemName}${EnvName}demo" }
+        - Sid: "GetAutorizationToken"
+          Effect: Allow
+          Action: 
+          - "ecr:GetAuthorizationToken"
+          Resource: "*"
+        - Sid: "ManageRepositoryContents"
+          Effect: Allow
+          Action: 
+          - "ecr:GetAuthorizationToken"
+          - "ecr:BatchCheckLayerAvailability"
+          - "ecr:GetDownloadUrlForLayer"
+          - "ecr:GetRepositoryPolicy"
+          - "ecr:DescribeRepositories"
+          - "ecr:ListImages"
+          - "ecr:DescribeImages"
+          - "ecr:BatchGetImage"
+          - "ecr:InitiateLayerUpload"
+          - "ecr:UploadLayerPart"
+          - "ecr:CompleteLayerUpload"
+          - "ecr:PutImage"
+          Resource: { "Fn::ImportValue": !Sub "${SystemName}${EnvName}demo" }
+# ------------------------------------------------------- #
+# IAM Role
+# ------------------------------------------------------- #
+  IamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${SystemName}-${EnvName}-CodeDeployRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - codedeploy.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSCodeDeployRoleForECS
