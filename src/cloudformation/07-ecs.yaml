@@ -10,18 +10,67 @@ Parameters:
     Type: String
     AllowedValues: [dev, stg, prod]
   ContainerName:
+    Description: Container name.
+    Type: String
+  ContainerVersion:
+    Description: Container version.
+    Type: String
+  TaskMemory:
+    AllowedValues: [ 256, 512, 1024, 2048, 4096  ]
+    Type: String
+  TaskCPU:
+    AllowedValues: [ 256, 512, 1024, 2048, 4096  ]
+    Type: String
+  ContainerMemory:
+    AllowedValues: [ 256, 512, 1024, 2048, 4096  ]
+    Type: String
+  ContainerCPU:
+    AllowedValues: [ 256, 512, 1024, 2048, 4096  ]
+    Type: String
+  PlatformVersion:
     Type: String
   ECSTaskDesiredCount:
+    Description: Number of Tasks.
     Type: Number
-
+  MaximumPercent:
+    Type: Number
+  MinimumHealthyPercent:
+    Type: Number
+  HealthCheckGracePeriodSeconds:
+    Type: Number
+  ASGMaxSize:
+    Type: Number
+  ASGMinSize:
+    Type: Number
+  Cooldown:
+    Type: Number
+  ServiceScaleEvaluationPeriods:
+    Description: The number of periods over which data is compared to the specified threshold
+    Type: Number
+    Default: 2
+    MinValue: 2
+  ServiceCpuScaleOutThreshold:
+    Type: Number
+    Description: Average CPU value to trigger auto scaling out
+    Default: 50
+    MinValue: 0
+    MaxValue: 100
+    ConstraintDescription: Value must be between 0 and 100
+  ServiceCpuScaleInThreshold:
+    Type: Number
+    Description: Average CPU value to trigger auto scaling in
+    Default: 25
+    MinValue: 0
+    MaxValue: 100
+    ConstraintDescription: Value must be between 0 and 100
 Resources:
 # ------------------------------------------------------- #
 # ECS Cluster
 # ------------------------------------------------------- #
   ECSCluster:
-    Type: 'AWS::ECS::Cluster'
+    Type: AWS::ECS::Cluster
     Properties:
-      ClusterName: !Sub '${SystemName}-${EnvName}-ecs-cluster'
+      ClusterName: !Sub ${SystemName}-${EnvName}-ecs-cluster
       ClusterSettings:
         - Name: containerInsights
           Value: enabled
@@ -29,32 +78,30 @@ Resources:
 # ECS TaskDefinition
 # ------------------------------------------------------- #
   ECSTaskDefinition:
-    Type: 'AWS::ECS::TaskDefinition'
+    Type: AWS::ECS::TaskDefinition
     Properties:
-      Family: !Sub '${SystemName}-${EnvName}-ecs-task'
+      Family: !Sub ${SystemName}-${EnvName}-ecs-task
       RequiresCompatibilities:
         - FARGATE
-      ExecutionRoleArn: !Sub 'arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole'
+      ExecutionRoleArn: !GetAtt  ECSTaskExecutionRole.Arn
       NetworkMode: awsvpc
-      Memory: 1024
-      Cpu: 512
-
-      #ContainerDefinitions
+      Memory: !Ref TaskMemory
+      Cpu: !Ref TaskCPU
       ContainerDefinitions:
-        - Name: !Sub '${SystemName}${EnvName}demo'
-          Image: !Sub '${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${ContainerName}:v1'
+        - Name: !Sub ${SystemName}${EnvName}${ContainerName}
+          Image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${SystemName}${EnvName}${ContainerName}:${ContainerVersion}
           LogConfiguration:
             LogDriver: awslogs
             Options:
-              awslogs-group: !Sub '/ecs/${SystemName}-${EnvName}-task'
-              awslogs-region: !Sub '${AWS::Region}'
+              awslogs-group: !Ref CloudwatchLogsGroup
+              awslogs-region: !Sub ${AWS::Region}
               awslogs-stream-prefix: ecs
-          MemoryReservation: 512
+          MemoryReservation: !Ref ContainerMemory
           PortMappings:
             - HostPort: 80
               Protocol: tcp
               ContainerPort: 80
-          Cpu: 256
+          Cpu: !Ref ContainerCPU
 # ------------------------------------------------------- #
 # ECS Service
 # ------------------------------------------------------- #
@@ -63,14 +110,16 @@ Resources:
     Properties:
       LaunchType: FARGATE
       TaskDefinition: !Ref ECSTaskDefinition
+      PlatformVersion: !Ref PlatformVersion
       Cluster: !Ref ECSCluster
-      ServiceName: !Sub '${SystemName}-${EnvName}-ecs-service'
+      ServiceName: !Sub ${SystemName}-${EnvName}-ecs-service
       DesiredCount: !Ref ECSTaskDesiredCount
       DeploymentConfiguration:
-        MaximumPercent: 200
-        MinimumHealthyPercent: 100
+        MaximumPercent: !Ref MaximumPercent
+        MinimumHealthyPercent: !Ref MinimumHealthyPercent
       DeploymentController:
         Type: CODE_DEPLOY
+      # Role: !GetAtt CodeDeployRole.Arn
       NetworkConfiguration:
         AwsvpcConfiguration:
           Subnets:
@@ -79,56 +128,120 @@ Resources:
           SecurityGroups:
             - { "Fn::ImportValue": !Sub "${SystemName}-${EnvName}-sg-container-id" }
           AssignPublicIp: DISABLED
-      HealthCheckGracePeriodSeconds: 120
+      HealthCheckGracePeriodSeconds: !Ref HealthCheckGracePeriodSeconds
       LoadBalancers:
-        - TargetGroupArn: { "Fn::ImportValue": !Sub "${SystemName}-${EnvName}-tg-demo-blue-arn" }
+        - 
+          TargetGroupArn: { "Fn::ImportValue": !Sub "${SystemName}-${EnvName}-tg-demo-blue-arn" }
           ContainerPort: 80
-          ContainerName: !Sub '${SystemName}${EnvName}demo'
-        - TargetGroupArn: { "Fn::ImportValue": !Sub "${SystemName}-${EnvName}-tg-demo-green-arn" }
-          ContainerPort: 10080
-          ContainerName: !Sub '${SystemName}${EnvName}demo'
+          ContainerName: !Sub ${SystemName}${EnvName}${ContainerName}
 # ------------------------------------------------------- #
-# IAM Policy
+# ServiceDiscovery
 # ------------------------------------------------------- #
-  IamPolicy:
-    Type: AWS::IAM::Policy
+  PrivateDnsNamespace:
+    Type: AWS::ServiceDiscovery::PrivateDnsNamespace
     Properties:
-      PolicyName: !Sub ${SystemName}-${EnvName}-accessing-ecr-repository-policy
-      Roles:
-        - !Ref IamRole
-      PolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-        - Sid: "ListImageInRepository"
-          Effect: Allow
-          Action: 
-          - "ecr:ListImages"
-          Resource: { "Fn::ImportValue": !Sub "${SystemName}${EnvName}demo" }
-        - Sid: "GetAutorizationToken"
-          Effect: Allow
-          Action: 
-          - "ecr:GetAuthorizationToken"
-          Resource: "*"
-        - Sid: "ManageRepositoryContents"
-          Effect: Allow
-          Action: 
-          - "ecr:GetAuthorizationToken"
-          - "ecr:BatchCheckLayerAvailability"
-          - "ecr:GetDownloadUrlForLayer"
-          - "ecr:GetRepositoryPolicy"
-          - "ecr:DescribeRepositories"
-          - "ecr:ListImages"
-          - "ecr:DescribeImages"
-          - "ecr:BatchGetImage"
-          - "ecr:InitiateLayerUpload"
-          - "ecr:UploadLayerPart"
-          - "ecr:CompleteLayerUpload"
-          - "ecr:PutImage"
-          Resource: { "Fn::ImportValue": !Sub "${SystemName}${EnvName}demo" }
+      Vpc: { "Fn::ImportValue": !Sub "${SystemName}-${EnvName}-vpc-id" }
+      Name: local
+  ServiceDiscovery:
+    Type: AWS::ServiceDiscovery::Service
+    Properties: 
+      Description: Discovery Service for the Demo Application
+      DnsConfig:
+        DnsRecords:
+          - TTL: 60
+            Type: A
+        NamespaceId: !GetAtt PrivateDnsNamespace.Id
+      HealthCheckCustomConfig: 
+        FailureThreshold: 1
+      Name: service
+# ------------------------------------------------------- #
+# AutoScaling Group
+# ------------------------------------------------------- #
+  ServiceScalingTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    Properties:
+      MinCapacity: !Ref ASGMinSize
+      MaxCapacity: !Ref ASGMaxSize
+      ResourceId: !Sub
+        - service/${EcsClusterName}/${EcsDefaultServiceName}
+        - EcsClusterName: !Ref ECSCluster
+          EcsDefaultServiceName: !Sub ${SystemName}-${EnvName}-ecs-service
+      RoleARN: !GetAtt ServiceAutoScalingRole.Arn
+      ScalableDimension: ecs:service:DesiredCount
+      ServiceNamespace: ecs
+    DependsOn: ECSService
+  ServiceScaleOutPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: !Sub ${SystemName}-${EnvName}-ecs-service-ScaleOutPolicy
+      PolicyType: StepScaling
+      ScalingTargetId: !Ref ServiceScalingTarget
+      StepScalingPolicyConfiguration:
+        AdjustmentType: ChangeInCapacity
+        Cooldown: !Ref Cooldown
+        MetricAggregationType: Average
+        StepAdjustments:
+          - ScalingAdjustment: 1
+            MetricIntervalLowerBound: 0
+  ServiceScaleInPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: !Sub ${SystemName}-${EnvName}-ecs-service-ScaleInPolicy"
+      PolicyType: StepScaling
+      ScalingTargetId: !Ref ServiceScalingTarget
+      StepScalingPolicyConfiguration:
+        AdjustmentType: ChangeInCapacity
+        Cooldown: !Ref Cooldown
+        MetricAggregationType: Average
+        StepAdjustments:
+          - ScalingAdjustment: -1
+            MetricIntervalUpperBound: 0
+  ServiceScaleOutAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${SystemName}-${EnvName}-ecs-service-ScaleOutAlarm"
+      EvaluationPeriods: !Ref ServiceScaleEvaluationPeriods
+      Statistic: Average
+      TreatMissingData: notBreaching
+      Threshold: !Ref ServiceCpuScaleOutThreshold
+      AlarmDescription: Alarm to add capacity if CPU is high
+      Period: 60
+      AlarmActions:
+        - !Ref ServiceScaleOutPolicy
+      Namespace: AWS/ECS
+      Dimensions:
+        - Name: ClusterName
+          Value: !Ref ECSCluster
+        - Name: ServiceName
+          Value: !Sub "${SystemName}-${EnvName}-ecs-service"
+      ComparisonOperator: GreaterThanThreshold
+      MetricName: CPUUtilization
+    DependsOn: ECSService
+  ServiceScaleInAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${SystemName}-${EnvName}-ecs-service-ScaleInAlarm"
+      EvaluationPeriods: !Ref ServiceScaleEvaluationPeriods
+      Statistic: Average
+      TreatMissingData: notBreaching
+      Threshold: !Ref ServiceCpuScaleInThreshold
+      AlarmDescription: Alarm to reduce capacity if container CPU is low
+      Period: 300
+      AlarmActions:
+        - !Ref ServiceScaleInPolicy
+      Namespace: AWS/ECS
+      Dimensions:
+        - Name: ClusterName
+          Value: !Ref ECSCluster
+        - Name: ServiceName
+          Value: !Sub "${SystemName}-${EnvName}-ecs-service"
+      ComparisonOperator: LessThanThreshold
+      MetricName: CPUUtilization
+    DependsOn: ECSService
 # ------------------------------------------------------- #
 # IAM Role
 # ------------------------------------------------------- #
-  IamRole:
+  CodeDeployRole:
     Type: AWS::IAM::Role
     Properties:
       RoleName: !Sub ${SystemName}-${EnvName}-CodeDeployRole
@@ -144,3 +257,52 @@ Resources:
       Path: /
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AWSCodeDeployRoleForECS
+  ECSTaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${SystemName}-${EnvName}-ECSTaskExecutionRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+  ServiceAutoScalingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: application-autoscaling.amazonaws.com
+            Action: sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: !Sub ${SystemName}${EnvName}${ContainerName}-autoscaling
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - application-autoscaling:*
+                  - cloudwatch:DescribeAlarms
+                  - cloudwatch:PutMetricAlarm
+                  - ecs:DescribeServices
+                  - ecs:UpdateService
+                Resource: '*'
+# ------------------------------------------------------- #
+# Cloudwatch Logs
+# ------------------------------------------------------- #
+  CloudwatchLogsGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      LogGroupName: !Sub /ecs/${SystemName}-${EnvName}-task
+      RetentionInDays: 14
