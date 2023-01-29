@@ -13,17 +13,40 @@ cd $(dirname $0)
 # ③構築するか、壊すかを選択（1:構築/2:破壊）
 # ④"### End deploying ECS/Fargate ####"と出力されるまで待つ
 # ------------------------------------------------------- #
+# 引数が指定されている場合それらを使用
+if [ $# == 3 ]; then
+    SYSTEM_NAME=$1
+    ENV_NAME=$2
+    num=$3
+elif [ $# == 2 ]; then
+    SYSTEM_NAME=$1
+    ENV_NAME=$2
+elif [ $# == 1 ]; then
+    SYSTEM_NAME=$1
+elif [ $# -gt 3 ]; then
+    echo "引数エラー"
+    echo "usage: driver.sh [SYSTEM_NAME] [ENV_NAME] [mode 1:Deploy / 2:Cleanup]"
+    exit 1
+fi
+
 # ①システム名（SYSTEM_NAME）を入力
-echo -n "SYSTEM_NAME: "
-read str
-SYSTEM_NAME=$str
+if [ "$1" == "" ]; then
+    echo -n "SYSTEM_NAME: "
+    read str
+    SYSTEM_NAME=$str
+fi
 # ②環境名（ENV_NAME）を入力
-echo -n "ENV_NAME: "
-read str
-ENV_NAME=$str
+if [ "$2" == "" ]; then
+    echo -n "ENV_NAME: "
+    read str
+    ENV_NAME=$str
+fi
 # ③構築するか、壊すかを選択（1:構築/2:破壊）
-echo -n "Select mode [1:Deploy / 2:Cleanup]: "
-read num
+if [ "$3" == "" ]; then
+    echo -n "Select mode [1:Deploy / 2:Cleanup]: "
+    read num
+fi
+
 if [ "$num" == "1" ]; then
     echo "### Start deploying ECS/Fargate ###"
     ./cfn_deploy.sh $SYSTEM_NAME $ENV_NAME

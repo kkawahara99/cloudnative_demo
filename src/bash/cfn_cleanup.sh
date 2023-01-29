@@ -24,6 +24,7 @@ export STACK_LIST=./stack-list
 # 関数インポート
 # ------------------------------------------------------- #
 source ./util/delete_stack.sh
+source ./util/put_containerInsights.sh
 
 # ------------------------------------------------------- #
 # Main
@@ -33,6 +34,12 @@ source ./util/delete_stack.sh
 # ------------------------------------------------------- #
 for line in `echo "$(cat ${STACK_LIST})" | tac`
 do
+  if [ $line = "07-ecs" ] ; then
+    # 07-ecsスタック削除前の特別処理
+    put_containerInsights 2
+  fi
+
+  # スタック削除
   delete_stack $line
 done
 

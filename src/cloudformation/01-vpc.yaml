@@ -259,7 +259,7 @@ Outputs:
     Value: !Ref MainVPC
     Export:
       Name: !Sub ${SystemName}-${EnvName}-vpc-id
-# InternetGateway
+# SecurityGroup
   AlbSecurityGroup:
     Value: !Ref AlbSecurityGroup
     Export:
