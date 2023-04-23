@@ -1,0 +1,96 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Create VPC Network
+
+Parameters:
+  SystemName:
+    Description: System name.
+    Type: String
+  EnvName:
+    Description: Environmental name.
+    Type: String
+    AllowedValues: [dev, stg, prod]
+  AlbCidr:
+    Description: ALB Cidr Block.
+    Type: String
+    Default: 0.0.0.0/0
+  LocalCidr:
+    Description: Local Cidr Block.
+    Type: String
+    Default: 1.2.3.4/32
+
+Resources:
+# ------------------------------------------------------- #
+# Security Group
+# ------------------------------------------------------- #
+  AlbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: SG
+      VpcId:
+        Fn::ImportValue: !Sub ${SystemName}-${EnvName}-vpc-id
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: !Ref AlbCidr
+      Tags:
+      - Key: Name
+        Value: !Sub ${SystemName}-${EnvName}-sg-alb
+  SecurityGroupDeveloper:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: HTTPS for Developer
+      VpcId: 
+        Fn::ImportValue: !Sub ${SystemName}-${EnvName}-vpc-id
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: !Ref LocalCidr
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !Ref SecurityGroupContainer
+          Description: HTTP for Container App
+      Tags:
+      - Key: Name
+        Value: !Sub ${SystemName}-${EnvName}-sg-developer
+  SecurityGroupContainer:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security Group of VPC Container App
+      VpcId:
+        Fn::ImportValue: !Sub ${SystemName}-${EnvName}-vpc-id
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !Ref AlbSecurityGroup
+          Description: HTTP for Container
+      Tags:
+      - Key: Name
+        Value: !Sub ${SystemName}-${EnvName}-sg-container
+  InboundRuleManagement:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref AlbSecurityGroup
+      IpProtocol: tcp
+      FromPort: 10080
+      ToPort: 10080
+      CidrIp: !Ref LocalCidr
+      Description: HTTP internal for Developer
+
+Outputs:
+# SecurityGroup
+  AlbSecurityGroup:
+    Value: !Ref AlbSecurityGroup
+    Export:
+      Name: !Sub ${SystemName}-${EnvName}-sg-alb-id
+  SecurityGroupDeveloper:
+    Value: !Ref SecurityGroupDeveloper
+    Export:
+      Name: !Sub ${SystemName}-${EnvName}-sg-developer-id
+  SecurityGroupContainer:
+    Value: !Ref SecurityGroupContainer
+    Export:
+      Name: !Sub ${SystemName}-${EnvName}-sg-container-id

@@ -7,11 +7,11 @@ cd $(dirname $0)
 # Main
 # ------------------------------------------------------- #
 # 説明：
-# ECS/Faregteアーキテクチャを一気に構築する為のシェルドライバ
+# CloudFormationテンプレートを一気に構築する為のシェルドライバ
 # ①システム名（SYSTEM_NAME）を入力
 # ②環境名（ENV_NAME）を入力
 # ③構築するか、壊すかを選択（1:構築/2:破壊）
-# ④"### End deploying ECS/Fargate ####"と出力されるまで待つ
+# ④"### End deploying システム名-環境名 ####"と出力されるまで待つ
 # ------------------------------------------------------- #
 # 引数が指定されている場合それらを使用
 if [ $# == 3 ]; then
@@ -48,17 +48,17 @@ if [ "$3" == "" ]; then
 fi
 
 if [ "$num" == "1" ]; then
-    echo "### Start deploying ECS/Fargate ###"
+    echo "### Start deploying $SYSTEM_NAME-$ENV_NAME ###"
     ./cfn_deploy.sh $SYSTEM_NAME $ENV_NAME
-    echo "### End deploying ECS/Fargate ###"
+    echo "### End deploying $SYSTEM_NAME-$ENV_NAME ###"
 elif [ "$num" == "2" ]; then
     echo -n "本当に削除してもよろしいですか？ [Y/n]: "
     read str
     case $str in
         [yY]*)
-            echo "### Start deleting ECS/Fargate ###"
+            echo "### Start deleting $SYSTEM_NAME-$ENV_NAME ###"
             ./cfn_cleanup.sh $SYSTEM_NAME $ENV_NAME
-            echo "### End deleting ECS/Fargate ###"
+            echo "### End deleting $SYSTEM_NAME-$ENV_NAME ###"
             ;;
         *) 
             ;;

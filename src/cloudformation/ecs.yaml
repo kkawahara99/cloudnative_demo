@@ -1,0 +1,230 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Create ECS
+
+Parameters:
+  SystemName:
+    Description: System name.
+    Type: String
+  EnvName:
+    Description: Environmental name.
+    Type: String
+    AllowedValues: [dev, stg, prod]
+  ContainerVersion:
+    Description: Container version.
+    Type: String
+  PlatformVersion:
+    Type: String
+  ECSTaskDesiredCount:
+    Description: Number of Tasks.
+    Type: Number
+  MaximumPercent:
+    Type: Number
+  MinimumHealthyPercent:
+    Type: Number
+  HealthCheckGracePeriodSeconds:
+    Type: Number
+  ASGMaxSize:
+    Type: Number
+  ASGMinSize:
+    Type: Number
+  Cooldown:
+    Type: Number
+  ServiceScaleEvaluationPeriods:
+    Description: The number of periods over which data is compared to the specified threshold
+    Type: Number
+    Default: 2
+    MinValue: 2
+  ServiceCpuScaleOutThreshold:
+    Type: Number
+    Description: Average CPU value to trigger auto scaling out
+    Default: 50
+    MinValue: 0
+    MaxValue: 100
+    ConstraintDescription: Value must be between 0 and 100
+  ServiceCpuScaleInThreshold:
+    Type: Number
+    Description: Average CPU value to trigger auto scaling in
+    Default: 25
+    MinValue: 0
+    MaxValue: 100
+    ConstraintDescription: Value must be between 0 and 100
+Resources:
+# ------------------------------------------------------- #
+# ECS Cluster
+# ------------------------------------------------------- #
+  ECSCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub ${SystemName}-${EnvName}-ecs-cluster
+      ClusterSettings:
+        - Name: containerInsights
+          Value: enabled
+# ------------------------------------------------------- #
+# ECS TaskDefinition
+# ------------------------------------------------------- #
+  ECSTaskDefinitionDemo:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub ${SystemName}-${EnvName}-ecs-task-demo
+      RequiresCompatibilities:
+        - FARGATE
+      ExecutionRoleArn: 
+        Fn::ImportValue: !Sub ${SystemName}-${EnvName}-role-ecstaskexecution-arn
+      NetworkMode: awsvpc
+      Memory: 1024
+      Cpu: 512
+      ContainerDefinitions:
+        - Name: !Sub ${SystemName}-${EnvName}-task-demo
+          Image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${SystemName}-${EnvName}-task-demo:${ContainerVersion}
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: 
+                Fn::ImportValue: !Sub ${SystemName}-${EnvName}-logs-task-demo
+              awslogs-region: !Sub ${AWS::Region}
+              awslogs-stream-prefix: ecs
+          MemoryReservation: 512
+          PortMappings:
+            - HostPort: 80
+              Protocol: tcp
+              ContainerPort: 80
+          Cpu: 256
+# ------------------------------------------------------- #
+# ECS Service
+# ------------------------------------------------------- #
+  ECSServiceDemo:
+    Type: AWS::ECS::Service
+    Properties:
+      LaunchType: FARGATE
+      TaskDefinition: !Ref ECSTaskDefinitionDemo
+      PlatformVersion: !Ref PlatformVersion
+      Cluster: !Ref ECSCluster
+      ServiceName: !Sub ${SystemName}-${EnvName}-ecs-service-demo
+      DesiredCount: !Ref ECSTaskDesiredCount
+      DeploymentConfiguration:
+        MaximumPercent: !Ref MaximumPercent
+        MinimumHealthyPercent: !Ref MinimumHealthyPercent
+      DeploymentController:
+        Type: CODE_DEPLOY
+      # Role: !GetAtt CodeDeployRole.Arn
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          Subnets:
+            - Fn::ImportValue: !Sub ${SystemName}-${EnvName}-subnet-private-az1-id
+            - Fn::ImportValue: !Sub ${SystemName}-${EnvName}-subnet-private-az2-id
+          SecurityGroups:
+            - Fn::ImportValue: !Sub ${SystemName}-${EnvName}-sg-container-id
+          AssignPublicIp: DISABLED
+      HealthCheckGracePeriodSeconds: !Ref HealthCheckGracePeriodSeconds
+      LoadBalancers:
+        - 
+          TargetGroupArn:
+            Fn::ImportValue: !Sub ${SystemName}-${EnvName}-tg-blue-arn
+          ContainerPort: 80
+          ContainerName: !Sub ${SystemName}-${EnvName}-task-demo
+# ------------------------------------------------------- #
+# ServiceDiscovery
+# ------------------------------------------------------- #
+  PrivateDnsNamespace:
+    Type: AWS::ServiceDiscovery::PrivateDnsNamespace
+    Properties:
+      Vpc: 
+        Fn::ImportValue: !Sub ${SystemName}-${EnvName}-vpc-id
+      Name: local
+  ServiceDiscovery:
+    Type: AWS::ServiceDiscovery::Service
+    Properties: 
+      Description: Discovery Service for the Demo Application
+      DnsConfig:
+        DnsRecords:
+          - TTL: 60
+            Type: A
+        NamespaceId: !GetAtt PrivateDnsNamespace.Id
+      HealthCheckCustomConfig: 
+        FailureThreshold: 1
+      Name: service
+# ------------------------------------------------------- #
+# AutoScaling Group
+# ------------------------------------------------------- #
+  ServiceScalingTargetDemo:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    Properties:
+      MinCapacity: !Ref ASGMinSize
+      MaxCapacity: !Ref ASGMaxSize
+      ResourceId: !Sub
+        - service/${EcsClusterName}/${EcsDefaultServiceName}
+        - EcsClusterName: !Ref ECSCluster
+          EcsDefaultServiceName: !Sub ${SystemName}-${EnvName}-ecs-service-demo
+      RoleARN: 
+        Fn::ImportValue: !Sub ${SystemName}-${EnvName}-role-serviceautoscaling-arn
+      ScalableDimension: ecs:service:DesiredCount
+      ServiceNamespace: ecs
+    DependsOn: ECSServiceDemo
+  ServiceScaleOutPolicyDemo:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: !Sub ${SystemName}-${EnvName}-ecs-service-demo-ScaleOutPolicy
+      PolicyType: StepScaling
+      ScalingTargetId: !Ref ServiceScalingTargetDemo
+      StepScalingPolicyConfiguration:
+        AdjustmentType: ChangeInCapacity
+        Cooldown: !Ref Cooldown
+        MetricAggregationType: Average
+        StepAdjustments:
+          - ScalingAdjustment: 1
+            MetricIntervalLowerBound: 0
+  ServiceScaleInPolicyDemo:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: !Sub ${SystemName}-${EnvName}-ecs-service-demo-ScaleInPolicy"
+      PolicyType: StepScaling
+      ScalingTargetId: !Ref ServiceScalingTargetDemo
+      StepScalingPolicyConfiguration:
+        AdjustmentType: ChangeInCapacity
+        Cooldown: !Ref Cooldown
+        MetricAggregationType: Average
+        StepAdjustments:
+          - ScalingAdjustment: -1
+            MetricIntervalUpperBound: 0
+  ServiceScaleOutAlarmDemo:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${SystemName}-${EnvName}-ecs-service-demo-ScaleOutAlarm"
+      EvaluationPeriods: !Ref ServiceScaleEvaluationPeriods
+      Statistic: Average
+      TreatMissingData: notBreaching
+      Threshold: !Ref ServiceCpuScaleOutThreshold
+      AlarmDescription: Alarm to add capacity if CPU is high
+      Period: 60
+      AlarmActions:
+        - !Ref ServiceScaleOutPolicyDemo
+      Namespace: AWS/ECS
+      Dimensions:
+        - Name: ClusterName
+          Value: !Ref ECSCluster
+        - Name: ServiceName
+          Value: !Sub "${SystemName}-${EnvName}-ecs-service-demo"
+      ComparisonOperator: GreaterThanThreshold
+      MetricName: CPUUtilization
+    DependsOn: ECSServiceDemo
+  ServiceScaleInAlarmDemo:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${SystemName}-${EnvName}-ecs-service-demo-ScaleInAlarm"
+      EvaluationPeriods: !Ref ServiceScaleEvaluationPeriods
+      Statistic: Average
+      TreatMissingData: notBreaching
+      Threshold: !Ref ServiceCpuScaleInThreshold
+      AlarmDescription: Alarm to reduce capacity if container CPU is low
+      Period: 300
+      AlarmActions:
+        - !Ref ServiceScaleInPolicyDemo
+      Namespace: AWS/ECS
+      Dimensions:
+        - Name: ClusterName
+          Value: !Ref ECSCluster
+        - Name: ServiceName
+          Value: !Sub "${SystemName}-${EnvName}-ecs-service-demo"
+      ComparisonOperator: LessThanThreshold
+      MetricName: CPUUtilization
+    DependsOn: ECSServiceDemo

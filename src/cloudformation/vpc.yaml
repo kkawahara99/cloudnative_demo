@@ -1,0 +1,231 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Create VPC
+
+Parameters:
+  SystemName:
+    Description: System name.
+    Type: String
+  EnvName:
+    Description: Environmental name.
+    Type: String
+    AllowedValues: [dev, stg, prod]
+  VpcCidr:
+    Description: VPC's Cidr Block.
+    Type: String
+    Default: 10.0.0.0/16
+  Public1Cidr:
+    Description: Public Subnet1 Cidr Block.
+    Type: String
+    Default: 10.0.0.0/24
+  Public2Cidr:
+    Description: Public Subnet2 Cidr Block.
+    Type: String
+    Default: 10.0.1.0/24
+  Private1Cidr:
+    Description: Private Subnet1 Cidr Block.
+    Type: String
+    Default: 10.0.32.0/24
+  Private2Cidr:
+    Description: Private Subnet2 Cidr Block.
+    Type: String
+    Default: 10.0.33.0/24
+  Db1Cidr:
+    Description: DB Subnet1 Cidr Block.
+    Type: String
+    Default: 10.0.128.0/24
+  Db2Cidr:
+    Description: DB Subnet2 Cidr Block.
+    Type: String
+    Default: 10.0.129.0/24
+
+Mappings: 
+  AzMap: 
+    ap-northeast-1:
+      1st: ap-northeast-1a
+      2nd: ap-northeast-1c
+      3rd: ap-northeast-1d
+
+Resources:
+# ------------------------------------------------------- #
+# VPC
+# ------------------------------------------------------- #
+  MainVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+      - Key: Name
+        Value: !Sub ${SystemName}-${EnvName}-vpc
+# ------------------------------------------------------- #
+# InternetGateway
+# ------------------------------------------------------- #
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+      - Key: Name
+        Value: !Sub ${SystemName}-${EnvName}-igw
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref MainVPC
+      InternetGatewayId: !Ref InternetGateway
+# ------------------------------------------------------- #
+# Subnet
+# ------------------------------------------------------- #
+  SubnetPublicAZ1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        !Ref MainVPC
+      CidrBlock: !Ref Public1Cidr
+      AvailabilityZone: !FindInMap [AzMap, !Ref AWS::Region, 1st]
+      Tags:
+      - Key: Name
+        Value: !Sub ${SystemName}-${EnvName}-subnet-public-az1
+  SubnetPublicAZ2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        !Ref MainVPC
+      CidrBlock: !Ref Public2Cidr
+      AvailabilityZone: !FindInMap [AzMap, !Ref AWS::Region, 2nd]
+      Tags:
+      - Key: Name
+        Value: !Sub ${SystemName}-${EnvName}-subnet-public-az2
+  SubnetPrivateAZ1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        !Ref MainVPC
+      CidrBlock: !Ref Private1Cidr
+      AvailabilityZone: !FindInMap [AzMap, !Ref AWS::Region, 1st]
+      Tags:
+      - Key: Name
+        Value: !Sub ${SystemName}-${EnvName}-subnet-private-az1
+  SubnetPrivateAZ2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        !Ref MainVPC
+      CidrBlock: !Ref Private2Cidr
+      AvailabilityZone: !FindInMap [AzMap, !Ref AWS::Region, 2nd]
+      Tags:
+      - Key: Name
+        Value: !Sub ${SystemName}-${EnvName}-subnet-private-az2
+  SubnetDbAZ1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        !Ref MainVPC
+      CidrBlock: !Ref Db1Cidr
+      AvailabilityZone: !FindInMap [AzMap, !Ref AWS::Region, 1st]
+      Tags:
+      - Key: Name
+        Value: !Sub ${SystemName}-${EnvName}-subnet-db-az1
+  SubnetDbAZ2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        !Ref MainVPC
+      CidrBlock: !Ref Db2Cidr
+      AvailabilityZone: !FindInMap [AzMap, !Ref AWS::Region, 2nd]
+      Tags:
+      - Key: Name
+        Value: !Sub ${SystemName}-${EnvName}-subnet-db-az2
+# ------------------------------------------------------- #
+# RouteTable
+# ------------------------------------------------------- #
+  # RouteTableInternet
+  RouteTableInternet:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:  
+        !Ref MainVPC
+      Tags:
+      - Key: Name
+        Value: !Sub ${SystemName}-${EnvName}-route-internet
+  RouteInternet:
+    Type: AWS::EC2::Route
+    Properties:
+       RouteTableId:
+         !Ref RouteTableInternet
+       DestinationCidrBlock: 0.0.0.0/0
+       GatewayId:
+         !Ref InternetGateway
+  SubnetRouteTableAssociationPublicAZ1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId:
+        !Ref SubnetPublicAZ1
+      RouteTableId:
+        !Ref RouteTableInternet
+  SubnetRouteTableAssociationPublicAZ2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId:
+        !Ref SubnetPublicAZ2
+      RouteTableId:
+        !Ref RouteTableInternet
+  # RouteTableApp
+  RouteTableApp:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        !Ref MainVPC
+      Tags:
+      - Key: Name
+        Value: !Sub ${SystemName}-${EnvName}-route-app
+  SubnetRouteTableAssociationPrivateAZ1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId:
+        !Ref SubnetPrivateAZ1
+      RouteTableId:
+        !Ref RouteTableApp
+  SubnetRouteTableAssociationPrivateAZ2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId:
+        !Ref SubnetPrivateAZ2
+      RouteTableId:
+        !Ref RouteTableApp
+
+Outputs:
+# VPC
+  MainVPC:
+    Value: !Ref MainVPC
+    Export:
+      Name: !Sub ${SystemName}-${EnvName}-vpc-id
+# Subnet
+  SubnetPublicAZ1:
+    Value: !Ref SubnetPublicAZ1
+    Export:
+      Name: !Sub ${SystemName}-${EnvName}-subnet-public-az1-id
+  SubnetPublicAZ2:
+    Value: !Ref SubnetPublicAZ2
+    Export:
+      Name: !Sub ${SystemName}-${EnvName}-subnet-public-az2-id
+  SubnetPrivateAZ1:
+    Value: !Ref SubnetPrivateAZ1
+    Export:
+      Name: !Sub ${SystemName}-${EnvName}-subnet-private-az1-id
+  SubnetPrivateAZ2:
+    Value: !Ref SubnetPrivateAZ2
+    Export:
+      Name: !Sub ${SystemName}-${EnvName}-subnet-private-az2-id
+  SubnetDbAZ1:
+    Value: !Ref SubnetDbAZ1
+    Export:
+      Name: !Sub ${SystemName}-${EnvName}-subnet-db-az1-id
+  SubnetDbAZ2:
+    Value: !Ref SubnetDbAZ2
+    Export:
+      Name: !Sub ${SystemName}-${EnvName}-subnet-db-az2-id
+# RouteTable
+  RouteTableApp:
+    Value: !Ref RouteTableApp
+    Export:
+      Name: !Sub ${SystemName}-${EnvName}-route-app-id

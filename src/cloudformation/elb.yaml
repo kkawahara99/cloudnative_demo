@@ -1,0 +1,107 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Create ELB
+
+Parameters:
+  SystemName:
+    Description: System name.
+    Type: String
+  EnvName:
+    Description: Environmental name.
+    Type: String
+    AllowedValues: [dev, stg, prod]
+
+Resources:
+# ------------------------------------------------------- #
+# Listener
+# ------------------------------------------------------- #
+  HTTPlistenerBlue:
+   Type: "AWS::ElasticLoadBalancingV2::Listener"
+   Properties:
+     DefaultActions:
+        - TargetGroupArn: !Ref TargetGroupBlue
+          Type: forward
+     LoadBalancerArn: !Ref LoadBalancer
+     Port: 80
+     Protocol: HTTP
+  HTTPlistenerGreen:
+   Type: "AWS::ElasticLoadBalancingV2::Listener"
+   Properties:
+     DefaultActions:
+        - TargetGroupArn: !Ref TargetGroupGreen
+          Type: forward
+     LoadBalancerArn: !Ref LoadBalancer
+     Port: 10080
+     Protocol: HTTP
+# ------------------------------------------------------- #
+# Application Load Balancer
+# ------------------------------------------------------- #
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub ${SystemName}-${EnvName}-alb
+      Scheme: internet-facing
+      IpAddressType: ipv4
+      SecurityGroups:
+        - { "Fn::ImportValue": !Sub "${SystemName}-${EnvName}-sg-alb-id" }
+      Subnets: 
+        - { "Fn::ImportValue": !Sub "${SystemName}-${EnvName}-subnet-public-az1-id" }
+        - { "Fn::ImportValue": !Sub "${SystemName}-${EnvName}-subnet-public-az2-id" }
+# ------------------------------------------------------- #
+# Target Group
+# ------------------------------------------------------- #
+  TargetGroupBlue: 
+    Type: "AWS::ElasticLoadBalancingV2::TargetGroup"
+    Properties: 
+      VpcId: { "Fn::ImportValue": !Sub "${SystemName}-${EnvName}-vpc-id" }
+      Name: !Sub ${SystemName}-${EnvName}-tg-blue
+      Protocol: HTTP
+      Port: 80
+      HealthCheckProtocol: HTTP
+      HealthCheckPath: /healthcheck
+      HealthCheckPort: traffic-port
+      HealthyThresholdCount: 3
+      UnhealthyThresholdCount: 2
+      HealthCheckTimeoutSeconds: 5
+      HealthCheckIntervalSeconds: 15
+      Matcher: 
+        HttpCode: 200
+      TargetType: ip
+      Tags: 
+        - Key: Name
+          Value: !Sub ${SystemName}-${EnvName}-tg-blue
+  TargetGroupGreen: 
+    Type: "AWS::ElasticLoadBalancingV2::TargetGroup"
+    Properties: 
+      VpcId: { "Fn::ImportValue": !Sub "${SystemName}-${EnvName}-vpc-id" }
+      Name: !Sub ${SystemName}-${EnvName}-tg-green
+      Protocol: HTTP
+      Port: 80
+      HealthCheckProtocol: HTTP
+      HealthCheckPath: /healthcheck
+      HealthCheckPort: traffic-port
+      HealthyThresholdCount: 3
+      UnhealthyThresholdCount: 2
+      HealthCheckTimeoutSeconds: 5
+      HealthCheckIntervalSeconds: 15
+      Matcher: 
+        HttpCode: 200
+      TargetType: ip
+      Tags: 
+        - Key: Name
+          Value: !Sub ${SystemName}-${EnvName}-tg-green
+
+Outputs:
+# Application Load Balancer
+  LoadBalancer:
+    Value: !Ref LoadBalancer
+    Export:
+      Name: !Sub ${SystemName}-${EnvName}-alb-arn
+# Target Group
+  TargetGroupBlue:
+    Value: !Ref TargetGroupBlue
+    Export:
+      Name: !Sub ${SystemName}-${EnvName}-tg-blue-arn
+  TargetGroupGreen:
+    Value: !Ref TargetGroupGreen
+    Export:
+      Name: !Sub ${SystemName}-${EnvName}-tg-green-arn

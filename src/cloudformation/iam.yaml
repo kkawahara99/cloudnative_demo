@@ -1,0 +1,85 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Create ECS
+
+Parameters:
+  SystemName:
+    Description: System name.
+    Type: String
+  EnvName:
+    Description: Environmental name.
+    Type: String
+    AllowedValues: [dev, stg, prod]
+Resources:
+# ------------------------------------------------------- #
+# IAM Role
+# ------------------------------------------------------- #
+  CodeDeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${SystemName}-${EnvName}-role-codedeploy
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - codedeploy.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSCodeDeployRoleForECS
+  ECSTaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${SystemName}-${EnvName}-role-ecstaskexecution
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+  ServiceAutoScalingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${SystemName}-${EnvName}-role-serviceautoscaling
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: application-autoscaling.amazonaws.com
+            Action: sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: !Sub ${SystemName}-${EnvName}-policy-autoscaling
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - application-autoscaling:*
+                  - cloudwatch:DescribeAlarms
+                  - cloudwatch:PutMetricAlarm
+                  - ecs:DescribeServices
+                  - ecs:UpdateService
+                Resource: '*'
+
+Outputs:
+  CodeDeployRole:
+    Value: !GetAtt CodeDeployRole.Arn
+    Export:
+      Name: !Sub ${SystemName}-${EnvName}-role-codedeploy-arn
+  ECSTaskExecutionRole:
+    Value: !GetAtt ECSTaskExecutionRole.Arn
+    Export:
+      Name: !Sub ${SystemName}-${EnvName}-role-ecstaskexecution-arn
+  ServiceAutoScalingRole:
+    Value: !GetAtt CodeDeployRole.Arn
+    Export:
+      Name: !Sub ${SystemName}-${EnvName}-role-serviceautoscaling-arn

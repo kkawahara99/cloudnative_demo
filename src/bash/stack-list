@@ -1,7 +1,10 @@
-01-vpc
-02-elb
-03-waf
-04-ecr
-05-cloud9
-06-vpce
-07-ecs
+s3
+ecr
+iam
+vpc
+vpc-securitygroup
+cloudwatch-logs
+elb
+waf
+vpc-endpoint
+ecs

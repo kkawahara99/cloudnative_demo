@@ -1,0 +1,28 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Create ECS
+
+Parameters:
+  SystemName:
+    Description: System name.
+    Type: String
+  EnvName:
+    Description: Environmental name.
+    Type: String
+    AllowedValues: [dev, stg, prod]
+Resources:
+# ------------------------------------------------------- #
+# Cloudwatch Logs
+# ------------------------------------------------------- #
+  CloudwatchLogsGroupDemo:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      LogGroupName: !Sub /ecs/${SystemName}-${EnvName}-task-demo
+      RetentionInDays: 14
+
+Outputs:
+  CloudwatchLogsGroupDemo:
+    Value: !Ref CloudwatchLogsGroupDemo
+    Export:
+      Name: !Sub ${SystemName}-${EnvName}-logs-task-demo

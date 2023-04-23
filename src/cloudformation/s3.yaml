@@ -1,0 +1,30 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Create S3
+
+Parameters:
+  SystemName:
+    Description: System name.
+    Type: String
+  EnvName:
+    Description: Environmental name.
+    Type: String
+    AllowedValues: [dev, stg, prod]
+
+Resources:
+# ------------------------------------------------------- #
+# S3 Bucket
+# ------------------------------------------------------- #
+  BucketDeploy:
+    Type: AWS::S3::Bucket
+    Properties: 
+      BucketName: !Sub ${SystemName}-${EnvName}-s3-deploy
+      Tags:
+        - Key: Name
+          Value: !Sub ${SystemName}-${EnvName}-s3-deploy
+  BucketWeb:
+    Type: AWS::S3::Bucket
+    Properties: 
+      BucketName: !Sub ${SystemName}-${EnvName}-s3-web
+      Tags:
+        - Key: Name
+          Value: !Sub ${SystemName}-${EnvName}-s3-web

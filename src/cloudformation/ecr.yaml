@@ -1,0 +1,45 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Create ECR
+
+Parameters:
+  SystemName:
+    Description: System name.
+    Type: String
+  EnvName:
+    Description: Environmental name.
+    Type: String
+    AllowedValues: [dev, stg, prod]
+
+Resources:
+# ------------------------------------------------------- #
+# ECR Repository
+# ------------------------------------------------------- #
+  Repository:
+    Type: AWS::ECR::Repository
+    Properties: 
+      RepositoryName: !Sub ${SystemName}-${EnvName}-ecr
+      ImageTagMutability: IMMUTABLE
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Delete more than 30 images",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 30
+                },
+                "action": {
+                  "type": "expire"
+                }
+              }
+            ]
+          }
+
+Outputs:
+  Repository:
+    Value: !GetAtt Repository.Arn
+    Export:
+      Name: !Sub ${SystemName}-${EnvName}-ecr-arn

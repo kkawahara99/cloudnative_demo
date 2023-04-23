@@ -1,0 +1,77 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Create VPC Network
+
+Parameters:
+  SystemName:
+    Description: System name.
+    Type: String
+  EnvName:
+    Description: Environmental name.
+    Type: String
+    AllowedValues: [dev, stg, prod]
+
+Resources:
+# ------------------------------------------------------- #
+# VPC Endpoint
+# ------------------------------------------------------- #
+  InterfaceEndpointECRAPI:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.ecr.api
+      VpcId: 
+        Fn::ImportValue: !Sub ${SystemName}-${EnvName}-vpc-id
+      SubnetIds:
+        - Fn::ImportValue: !Sub ${SystemName}-${EnvName}-subnet-private-az1-id
+        - Fn::ImportValue: !Sub ${SystemName}-${EnvName}-subnet-private-az2-id
+      PrivateDnsEnabled: true
+      SecurityGroupIds:
+        - Fn::ImportValue: !Sub ${SystemName}-${EnvName}-sg-developer-id
+      VpcEndpointType: Interface
+  InterfaceEndpointECRDKR:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.ecr.dkr
+      VpcId:
+        Fn::ImportValue: !Sub ${SystemName}-${EnvName}-vpc-id
+      SubnetIds: 
+        - Fn::ImportValue: !Sub ${SystemName}-${EnvName}-subnet-private-az1-id
+        - Fn::ImportValue: !Sub ${SystemName}-${EnvName}-subnet-private-az2-id
+      PrivateDnsEnabled: true
+      SecurityGroupIds:
+        - Fn::ImportValue: !Sub ${SystemName}-${EnvName}-sg-developer-id
+      VpcEndpointType: Interface
+  InterfaceEndpointLogs:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.logs
+      VpcId: 
+        Fn::ImportValue: !Sub ${SystemName}-${EnvName}-vpc-id
+      SubnetIds: 
+        - Fn::ImportValue: !Sub ${SystemName}-${EnvName}-subnet-private-az1-id
+        - Fn::ImportValue: !Sub ${SystemName}-${EnvName}-subnet-private-az2-id
+      PrivateDnsEnabled: true
+      SecurityGroupIds:
+        - Fn::ImportValue: !Sub ${SystemName}-${EnvName}-sg-developer-id
+      VpcEndpointType: Interface
+  InterfaceEndpointSSM:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.ssm
+      VpcId:
+        Fn::ImportValue: !Sub ${SystemName}-${EnvName}-vpc-id
+      SubnetIds: 
+        - Fn::ImportValue: !Sub ${SystemName}-${EnvName}-subnet-private-az1-id
+        - Fn::ImportValue: !Sub ${SystemName}-${EnvName}-subnet-private-az2-id
+      PrivateDnsEnabled: true
+      SecurityGroupIds:
+        - Fn::ImportValue: !Sub ${SystemName}-${EnvName}-sg-developer-id
+      VpcEndpointType: Interface
+  GatewayEndpointS3:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.s3
+      VpcId:
+        Fn::ImportValue: !Sub ${SystemName}-${EnvName}-vpc-id
+      RouteTableIds:
+        - Fn::ImportValue: !Sub ${SystemName}-${EnvName}-route-app-id
+      VpcEndpointType: Gateway
